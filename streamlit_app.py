@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
-from engine import REGION_DEFAULTS, EmissionResult, RegionInputs, VehicleInputs, breakeven_miles, build_reference_vehicle, compute_vehicle_emissions, generate_narrative, generate_recommendation, lookup_region_defaults
+from engine import REGION_DEFAULTS, EmissionResult, RegionInputs, VehicleInputs, breakeven_miles, build_reference_vehicle, compute_vehicle_emissions, generate_narrative, generate_recommendation, lookup_region_defaults, try_dynamic_lookup as engine_try_dynamic_lookup
 
 
 st.set_page_config(
@@ -32,237 +32,6 @@ CLASS_KEYWORDS = {
     "sedan": ["camry", "accord", "model 3", "civic", "corolla", "elantra", "altima"],
     "hatchback": ["golf", "leaf", "prius", "bolt", "fit"],
     "van": ["odyssey", "sienna", "pacifica", "transit"],
-}
-
-FALLBACK_VEHICLE_SPECS = {
-    "sedan": {
-        "ICE": {
-            "fuel_economy_mpg": 30,
-            "kwh_per_mile": None,
-            "battery_kwh": None,
-            "vehicle_mfg_kg": 6500,
-        },
-        "HEV": {
-            "fuel_economy_mpg": 50,
-            "kwh_per_mile": None,
-            "battery_kwh": 1.5,
-            "vehicle_mfg_kg": 7000,
-        },
-        "PHEV": {
-            "fuel_economy_mpg": 40,
-            "kwh_per_mile": 0.30,
-            "battery_kwh": 12,
-            "vehicle_mfg_kg": 7500,
-        },
-        "BEV": {
-            "fuel_economy_mpg": None,
-            "kwh_per_mile": 0.27,
-            "battery_kwh": 60,
-            "vehicle_mfg_kg": 8000,
-        },
-    },
-    "compact_suv": {
-        "ICE": {
-            "fuel_economy_mpg": 26,
-            "kwh_per_mile": None,
-            "battery_kwh": None,
-            "vehicle_mfg_kg": 7500,
-        },
-        "HEV": {
-            "fuel_economy_mpg": 38,
-            "kwh_per_mile": None,
-            "battery_kwh": 1.6,
-            "vehicle_mfg_kg": 8000,
-        },
-        "PHEV": {
-            "fuel_economy_mpg": 35,
-            "kwh_per_mile": 0.33,
-            "battery_kwh": 14,
-            "vehicle_mfg_kg": 8500,
-        },
-        "BEV": {
-            "fuel_economy_mpg": None,
-            "kwh_per_mile": 0.30,
-            "battery_kwh": 75,
-            "vehicle_mfg_kg": 9000,
-        },
-    },
-    "midsize_suv": {
-        "ICE": {
-            "fuel_economy_mpg": 22,
-            "kwh_per_mile": None,
-            "battery_kwh": None,
-            "vehicle_mfg_kg": 9000,
-        },
-        "HEV": {
-            "fuel_economy_mpg": 32,
-            "kwh_per_mile": None,
-            "battery_kwh": 1.8,
-            "vehicle_mfg_kg": 9500,
-        },
-        "PHEV": {
-            "fuel_economy_mpg": 30,
-            "kwh_per_mile": 0.38,
-            "battery_kwh": 17,
-            "vehicle_mfg_kg": 10000,
-        },
-        "BEV": {
-            "fuel_economy_mpg": None,
-            "kwh_per_mile": 0.36,
-            "battery_kwh": 90,
-            "vehicle_mfg_kg": 11000,
-        },
-    },
-    "pickup": {
-        "ICE": {
-            "fuel_economy_mpg": 18,
-            "kwh_per_mile": None,
-            "battery_kwh": None,
-            "vehicle_mfg_kg": 11000,
-        },
-        "HEV": {
-            "fuel_economy_mpg": 24,
-            "kwh_per_mile": None,
-            "battery_kwh": 2.0,
-            "vehicle_mfg_kg": 12000,
-        },
-        "PHEV": {
-            "fuel_economy_mpg": 22,
-            "kwh_per_mile": 0.45,
-            "battery_kwh": 20,
-            "vehicle_mfg_kg": 13000,
-        },
-        "BEV": {
-            "fuel_economy_mpg": None,
-            "kwh_per_mile": 0.50,
-            "battery_kwh": 130,
-            "vehicle_mfg_kg": 15000,
-        },
-    },
-    "hatchback": {
-        "ICE": {
-            "fuel_economy_mpg": 32,
-            "kwh_per_mile": None,
-            "battery_kwh": None,
-            "vehicle_mfg_kg": 6000,
-        },
-        "HEV": {
-            "fuel_economy_mpg": 52,
-            "kwh_per_mile": None,
-            "battery_kwh": 1.3,
-            "vehicle_mfg_kg": 6500,
-        },
-        "PHEV": {
-            "fuel_economy_mpg": 42,
-            "kwh_per_mile": 0.28,
-            "battery_kwh": 10,
-            "vehicle_mfg_kg": 7000,
-        },
-        "BEV": {
-            "fuel_economy_mpg": None,
-            "kwh_per_mile": 0.25,
-            "battery_kwh": 50,
-            "vehicle_mfg_kg": 7500,
-        },
-    },
-}
-
-VEHICLE_SPEC_DB = {
-    ("Tesla", "Model 3", 2024): {
-        "vehicle_class": "sedan",
-        "tech_type": "BEV",
-        "fuel_economy_mpg": None,
-        "kwh_per_mile": 0.26,
-        "battery_kwh": 75.0,
-        "vehicle_mfg_kg": 8500.0,
-    },
-    ("Toyota", "Prius", 2024): {
-        "vehicle_class": "hatchback",
-        "tech_type": "HEV",
-        "fuel_economy_mpg": 57.0,
-        "kwh_per_mile": None,
-        "battery_kwh": 1.3,
-        "vehicle_mfg_kg": 7600.0,
-    },
-    ("Toyota", "Rav4", 2024): {
-        "vehicle_class": "suv",
-        "tech_type": "ICE",
-        "fuel_economy_mpg": 30.0,
-        "kwh_per_mile": None,
-        "battery_kwh": None,
-        "vehicle_mfg_kg": 7800.0,
-    },
-    ("Toyota", "Rav4 Hybrid", 2024): {
-        "vehicle_class": "suv",
-        "tech_type": "HEV",
-        "fuel_economy_mpg": 39.0,
-        "kwh_per_mile": None,
-        "battery_kwh": 1.6,
-        "vehicle_mfg_kg": 8000.0,
-    },
-}
-
-AVERAGE_REFERENCE_SPEC_DB = {
-    ("BEV", "sedan"): {
-        "fuel_economy_mpg": None,
-        "kwh_per_mile": 0.27,
-        "battery_kwh": 60,
-        "vehicle_mfg_kg": 8000,
-    },
-    ("ICE", "sedan"): {
-        "fuel_economy_mpg": 30,
-        "kwh_per_mile": None,
-        "battery_kwh": None,
-        "vehicle_mfg_kg": 6500,
-    },
-    ("BEV", "compact_suv"): {
-        "fuel_economy_mpg": None,
-        "kwh_per_mile": 0.30,
-        "battery_kwh": 75,
-        "vehicle_mfg_kg": 9000,
-    },
-    ("ICE", "compact_suv"): {
-        "fuel_economy_mpg": 26,
-        "kwh_per_mile": None,
-        "battery_kwh": None,
-        "vehicle_mfg_kg": 7500,
-    },
-    ("BEV", "midsize_suv"): {
-        "fuel_economy_mpg": None,
-        "kwh_per_mile": 0.36,
-        "battery_kwh": 90,
-        "vehicle_mfg_kg": 11000,
-    },
-    ("ICE", "midsize_suv"): {
-        "fuel_economy_mpg": 22,
-        "kwh_per_mile": None,
-        "battery_kwh": None,
-        "vehicle_mfg_kg": 9000,
-    },
-    ("BEV", "pickup"): {
-        "fuel_economy_mpg": None,
-        "kwh_per_mile": 0.50,
-        "battery_kwh": 130,
-        "vehicle_mfg_kg": 15000,
-    },
-    ("ICE", "pickup"): {
-        "fuel_economy_mpg": 18,
-        "kwh_per_mile": None,
-        "battery_kwh": None,
-        "vehicle_mfg_kg": 11000,
-    },
-    ("BEV", "hatchback"): {
-        "fuel_economy_mpg": None,
-        "kwh_per_mile": 0.25,
-        "battery_kwh": 50,
-        "vehicle_mfg_kg": 7500,
-    },
-    ("ICE", "hatchback"): {
-        "fuel_economy_mpg": 32,
-        "kwh_per_mile": None,
-        "battery_kwh": None,
-        "vehicle_mfg_kg": 6000,
-    },
 }
 
 
@@ -312,18 +81,6 @@ def parse_vehicle_from_text(text: str) -> VehicleFormState:
     )
 
 
-def resolve_vehicle_class(user_vehicle_class: str | None, model: str | None) -> str:
-    normalized_class = (user_vehicle_class or "").lower().strip()
-    if normalized_class in FALLBACK_VEHICLE_SPECS:
-        return normalized_class
-
-    inferred_class = detect_vehicle_class(model or "")
-    if inferred_class in FALLBACK_VEHICLE_SPECS:
-        return inferred_class
-
-    return "sedan"
-
-
 def build_vehicle_name(year: int | None, make: str, model: str) -> str:
     return " ".join(part for part in [str(year) if year else "", make.strip(), model.strip()] if part).strip()
 
@@ -348,67 +105,91 @@ def format_region_label(region_key: str) -> str:
     return region_key.replace("_", " ").title()
 
 
-def try_dynamic_lookup(make: str, model: str, year: int | None) -> dict | None:
-    if not make or not model or year is None:
-        return None
-    normalized_key = (make.strip().title(), model.strip().title(), year)
-    return VEHICLE_SPEC_DB.get(normalized_key)
+# --------------------------------------------------------------------
+# CLEAN + ROBUST VEHICLE LOOKUP FUNCTIONS
+# --------------------------------------------------------------------
 
+def get_vehicle_specs(make, model, year, vehicle_class, tech_type):
+    """
+    Full 3-layer cascade:
+    1. Provider lookup (via engine.try_dynamic_lookup)
+    2. Curated internal data (inside engine)
+    3. Fallback table (inside engine)
+    """
 
-def try_dynamic_reference_lookup(
-    vehicle_class: str,
-    tech_type: str,
-) -> dict | None:
-    normalized_class = vehicle_class.lower()
-    normalized_tech = tech_type.upper()
-    query = f"average {normalized_tech} {normalized_class}"
-    return lookup_average_reference_specs(query)
+    # Normalize inputs
+    vc = (vehicle_class or "").strip().lower()
+    tt = (tech_type or "").strip().lower()
 
+    # Call the engine's full cascade
+    specs = engine_try_dynamic_lookup(make, model, year, vc, tt)
 
-def lookup_average_reference_specs(query: str) -> dict | None:
-    normalized_query = query.strip().lower().replace("-", "_")
-    for (tech_type, vehicle_class), data in AVERAGE_REFERENCE_SPEC_DB.items():
-        expected_query = f"average {tech_type.lower()} {vehicle_class}"
-        if normalized_query == expected_query:
-            return {
-                "tech_type": tech_type,
-                "vehicle_class": vehicle_class,
-                **data,
-            }
-    return None
+    # If engine returns something valid, use it
+    if specs:
+        return specs
 
-
-def fallback_table_lookup(vehicle_class: str, tech_type: str) -> dict:
-    vehicle_class = vehicle_class.lower()
-    tech_type = tech_type.upper()
-
-    if vehicle_class not in FALLBACK_VEHICLE_SPECS:
-        raise ValueError(f"Unknown vehicle class: {vehicle_class}")
-
-    if tech_type not in FALLBACK_VEHICLE_SPECS[vehicle_class]:
-        raise ValueError(f"Unknown tech type: {tech_type}")
-
-    return FALLBACK_VEHICLE_SPECS[vehicle_class][tech_type]
-
-
-def get_vehicle_specs(make: str, model: str, year: int | None, vehicle_class: str, tech_type: str) -> dict:
-    # 1. Try dynamic lookup (Codex-assisted)
-    data = try_dynamic_lookup(make, model, year)
-    if data is not None:
-        return data
-
-    # 2. Fallback to internal tables
-    return fallback_table_lookup(vehicle_class, tech_type)
-
-
-def opposite_technology_type(tech_type: str) -> str:
-    opposites = {
-        "ICE": "BEV",
-        "BEV": "ICE",
-        "HEV": "ICE",
-        "PHEV": "ICE",
+    fallback_class_map = {
+        "compact_suv": "suv",
+        "midsize_suv": "suv",
+        "pickup": "truck",
+        "hatchback": "sedan",
+        "van": "suv",
+        "wagon": "sedan",
+        "coupe": "sedan",
+        "other": "sedan",
     }
-    return opposites.get(tech_type.upper(), "BEV")
+    safe_class = fallback_class_map.get(vc, vc or "sedan")
+    safe_tech = tt or "ice"
+
+    # Absolute safety fallback (never fail)
+    if safe_tech == "bev":
+        return {
+            "vehicle_class": vc or "sedan",
+            "tech_type": "BEV",
+            "vehicle_mfg_kg": 1800,
+            "battery_kwh": 60,
+            "kwh_per_mile": 0.30,
+            "fuel_economy_mpg": None,
+            "curb_weight": 1800,
+            "fuel_eff": None,
+        }
+    if safe_tech == "phev":
+        return {
+            "vehicle_class": vc or "sedan",
+            "tech_type": "PHEV",
+            "vehicle_mfg_kg": 1800,
+            "battery_kwh": 14,
+            "kwh_per_mile": 0.33,
+            "fuel_economy_mpg": 35,
+            "curb_weight": 1800,
+            "fuel_eff": 35,
+        }
+    if safe_tech == "hev":
+        return {
+            "vehicle_class": vc or "sedan",
+            "tech_type": "HEV",
+            "vehicle_mfg_kg": 1700,
+            "battery_kwh": 1.5,
+            "kwh_per_mile": None,
+            "fuel_economy_mpg": 50,
+            "curb_weight": 1700,
+            "fuel_eff": 50,
+        }
+
+    return {
+        "vehicle_class": safe_class,
+        "tech_type": "ICE",
+        "vehicle_mfg_kg": 1800 if safe_class == "sedan" else 2000 if safe_class == "suv" else 2500,
+        "battery_kwh": 0,
+        "kwh_per_mile": None,
+        "fuel_economy_mpg": 30 if safe_class == "sedan" else 22 if safe_class == "suv" else 18,
+        "curb_weight": 1800 if safe_class == "sedan" else 2000 if safe_class == "suv" else 2500,
+        "fuel_eff": 30 if safe_class == "sedan" else 22 if safe_class == "suv" else 18,
+    }
+
+# --------------------------------------------------------------------
+# END OF REPLACEMENT
+# --------------------------------------------------------------------
 
 
 def vehicle_summary(vehicle: VehicleInputs, result: EmissionResult) -> dict:
@@ -489,10 +270,10 @@ def render_vehicle_inputs(prefix: str, title: str, lifetime_miles: float) -> dic
         vehicle_class = resolved_vehicle_class
 
     defaults = {
-        "fuel_economy_mpg": specs.get("fuel_economy_mpg"),
+        "fuel_economy_mpg": specs.get("fuel_economy_mpg", specs.get("fuel_eff")),
         "kwh_per_mile": specs.get("kwh_per_mile"),
         "battery_kwh": specs.get("battery_kwh"),
-        "vehicle_mfg_kg": specs.get("vehicle_mfg_kg"),
+        "vehicle_mfg_kg": specs.get("vehicle_mfg_kg", specs.get("curb_weight")),
     }
     fuel_economy_mpg = None
     kwh_per_mile = None
